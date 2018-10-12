@@ -128,10 +128,8 @@ class qryptos (Exchange):
                 minAmount = 0.001
             elif base == 'ETH':
                 minAmount = 0.01
-            ## ADDED BLOCK ##
             elif base == 'GET':
                 minAmount = 7.0
-            ## END ADDED BLOCK ##
             if quote == 'BTC':
                 minPrice = 0.00000001
             elif quote == 'ETH' or quote == 'USD' or quote == 'JPY':
@@ -149,12 +147,11 @@ class qryptos (Exchange):
                 'price': None,
             }
             if minAmount is not None:
-                ## ADDED BLOCK ##
                 if base == 'GET':
                     precision['amount'] = 4
                 elif base == 'ETH':
                     precision['amount'] = 8
-                else:  ## END ADDED BLOCK ##
+                else:
                     precision['amount'] = -math.log10(minAmount)
             if minPrice is not None:
                 precision['price'] = -math.log10(minPrice)
@@ -277,7 +274,7 @@ class qryptos (Exchange):
         }, params))
         return self.parse_ticker(ticker, market)
 
-    def parse_trade(self, trade, market, closed_order=None, closed_orders=None):  # MODIFIED
+    def parse_trade(self, trade, market):
         # {            id:  12345,
         #         quantity: "6.789",
         #            price: "98765.4321",
@@ -290,37 +287,15 @@ class qryptos (Exchange):
         # 'my_side' gets filled for fetchMyTrades only and may differ from 'taker_side'
         mySide = self.safe_string(trade, 'my_side')
         side = mySide if (mySide is not None) else takerSide
+        order_id = self.safe_string(trade, 'order_id')
         takerOrMaker = None
         if mySide is not None:
             takerOrMaker = 'taker' if (takerSide == mySide) else 'maker'
 
-        ## ADDED BLOCK  ##
-        # Qryptos/Liquid/Quoinex API does not return Order ID's when fetching
-        # executions/trades. So that the bookkeeping mechanism knows when an order
-        # got a trade, we need to search for this trade in the list of trades for all
-        # closed orders which is only fetched once in the parent.
-
-        order = None
-        if not closed_order:
-            found = False
-            for closed_order in closed_orders:
-                if found:
-                    break
-                closed_order_trades = closed_order.get('trades', None)
-                for closed_trade in  closed_order_trades:
-                    if str(closed_trade['id']) == str(trade['id']):
-                        order = closed_trade['order']
-                        found = True
-                        break
-        else:
-            order = closed_order
-
-        ## END ADDED BLOCK ##
-
         return {
             'info': trade,
             'id': str(trade['id']),
-            'order': str(order) if order else None,  # MODIFIED
+            'order': order_id if order_id else None,
             'timestamp': timestamp,
             'datetime': self.iso8601(timestamp),
             'symbol': market['symbol'],
@@ -336,6 +311,7 @@ class qryptos (Exchange):
         market = self.market(symbol)
         request = {
             'product_id': market['id'],
+            'with_details': True
         }
         if limit is not None:
             request['limit'] = limit
@@ -351,6 +327,7 @@ class qryptos (Exchange):
         market = self.market(symbol)
         request = {
             'product_id': market['id'],
+            'with_details': True
         }
         if limit is not None:
             request['limit'] = limit
@@ -400,19 +377,7 @@ class qryptos (Exchange):
         symbol = None
         if market is not None:
             symbol = market['symbol']
-
-        ## ADDED BLOCK ##
-        # We specificaly turned on the 'with_details' flag in the order calls which requests
-        # quoinex/qryptos/liquid to return executions for this order which we then parse and
-        # returns as 'trades'
-
-        executions = order.get('executions', None)
-        trades = []
-        if executions:
-            trades = [self.parse_trade(trade, market, str(order['id']))
-                      for trade in executions]
-
-        ## END ADDED BLOCK ##
+        trades = [self.parse_trade(trade, market) for trade in order.get('executions', [])]
 
         return {
             'id': str(order['id']),
@@ -427,7 +392,7 @@ class qryptos (Exchange):
             'amount': amount,
             'filled': filled,
             'remaining': amount - filled,
-            'trades': trades if trades else None,  # MODIFIED
+            'trades': trades,
             'fee': {
                 'currency': None,
                 'cost': self.safe_float(order, 'order_fee'),
@@ -439,6 +404,7 @@ class qryptos (Exchange):
         self.load_markets()
         order = self.privateGetOrdersId(self.extend({
             'id': id,
+            'with_details': True
         }, params))
         return self.parse_order(order)
 
@@ -446,7 +412,7 @@ class qryptos (Exchange):
         self.load_markets()
         market = None
         request = {}
-        request['with_details'] = 1  # MODIFIED
+        request['with_details'] = True
         if symbol is not None:
             market = self.market(symbol)
             request['product_id'] = market['id']

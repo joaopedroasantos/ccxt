@@ -1250,9 +1250,8 @@ class Exchange(object):
         return amount * scale
 
     def parse_trades(self, trades, market=None, since=None, limit=None):
-        orders = self.fetch_closed_orders(market['symbol'], limit=100)  # MODIFIED
         array = self.to_array(trades)
-        array = [self.parse_trade(trade, market, None, orders) for trade in array]  # MODIFIED
+        array = [self.parse_trade(trade, market) for trade in array]
         array = self.sort_by(array, 'timestamp')
         symbol = market['symbol'] if market else None
         return self.filter_by_symbol_since_limit(array, symbol, since, limit)
