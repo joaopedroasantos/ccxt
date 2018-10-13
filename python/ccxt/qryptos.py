@@ -335,6 +335,7 @@ class qryptos (Exchange):
 
     def create_order(self, symbol, type, side, amount, price=None, params={}):
         self.load_markets()
+        params['with_details'] = True
         order = {
             'order_type': type,
             'product_id': self.market_id(symbol),
@@ -350,6 +351,7 @@ class qryptos (Exchange):
         self.load_markets()
         result = self.privatePutOrdersIdCancel(self.extend({
             'id': id,
+            'with_details': True
         }, params))
         order = self.parse_order(result)
         if order['status'] == 'closed':
